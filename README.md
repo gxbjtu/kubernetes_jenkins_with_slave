@@ -1,6 +1,6 @@
-# kubernetes_jenkins_with_slave
-Jenkins master and slave on kubernetes
+## Continuous Integration and Deployment with Jenkins on kubernetes
 
+Installation:
 1. build master image and push to your docker hub
 2. build slave image and push to your docker hub
 3. create nfs storage and deploy [kube-pre](kube/kube-pre.yml)
