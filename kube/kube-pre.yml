@@ -1,0 +1,23 @@
+# namespace definition
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cicd
+
+---
+# persistence volume, the "nfs" should be replaced with your storage
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jenkins-pv
+  namespace: cicd
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: ${JENKINS_VOLUME}
+    server: ${NFS_SERVER}
+

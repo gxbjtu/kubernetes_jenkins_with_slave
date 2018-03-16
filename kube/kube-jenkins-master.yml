@@ -1,0 +1,111 @@
+# claim the persistence volume you have defined
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: jenkins-pvc
+  namespace: cicd
+spec:
+  volumeName: jenkins-pv
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins
+  namespace: cicd
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: jenkins
+  namespace: cicd
+
+---
+# the deployment of jenkins master, the "image" should be replaced with the one you build before
+# notice the mount of docker/kubectl command by hostPath
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: cicd
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: jenkins
+    spec:
+      serviceAccount: jenkins
+      containers:
+      - name: jenkins
+        image: ${JENKINS_IMAGE}
+        imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: /var/jenkins_home
+          name: home
+        - mountPath: /usr/bin/docker
+          name: docker-cmd
+        - mountPath: /var/run/docker.sock
+          name: docker-sock
+        - mountPath: /usr/lib/x86_64-linux-gnu/libltdl.so.7
+          name: libltdl-so
+        - mountPath: /usr/bin/kubectl
+          name: kubectl-cmd
+        env:
+          - name: JAVA_OPTS
+            value: "-Duser.timezone=Asia/Shanghai"
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: jenkins-pvc
+        - name: docker-cmd
+          hostPath:
+            path: /usr/bin/docker
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: libltdl-so
+          hostPath:
+            path: /usr/lib64/libltdl.so.7
+        - name: kubectl-cmd
+          hostPath:
+            path: /usr/bin/kubectl
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-svc
+  namespace: cicd
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: ${JENKINS_SERVER_PORT}
+    name: web
+  - port: 50000
+    targetPort: 50000
+    nodePort: ${JENKINS_TUNNEL_PORT}
+    name: agent
+  type: NodePort
+  selector:
+    k8s-app: jenkins
+
